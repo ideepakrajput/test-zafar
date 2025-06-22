@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
 
 const testPayload = {
     "category": "countries",
@@ -54,6 +56,20 @@ const testPayload = {
     }
 };
 
+async function saveResponseToFile(data, filename) {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `${filename}_${timestamp}.json`;
+        const filePath = path.join(__dirname, fileName);
+
+        await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+        console.log(`✅ Response saved to: ${fileName}`);
+        return fileName;
+    } catch (error) {
+        console.error('❌ Error saving file:', error.message);
+    }
+}
+
 async function testAPI() {
     try {
         console.log('=== Starting API Test ===');
@@ -69,14 +85,52 @@ async function testAPI() {
         console.log('Status:', response.status);
         console.log('Response Data:', JSON.stringify(response.data, null, 2));
 
+        // Save successful response to file
+        const responseData = {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            data: response.data,
+            timestamp: new Date().toISOString(),
+            testType: 'success'
+        };
+
+        await saveResponseToFile(responseData, 'api_response_success');
+
     } catch (error) {
+        let errorData = {
+            timestamp: new Date().toISOString(),
+            testType: 'error'
+        };
+
         if (error.response) {
             console.error('API Error Response:', error.response.status, error.response.data);
+            errorData = {
+                ...errorData,
+                status: error.response.status,
+                statusText: error.response.statusText,
+                headers: error.response.headers,
+                data: error.response.data,
+                errorType: 'api_error'
+            };
         } else if (error.request) {
             console.error('No response received:', error.message);
+            errorData = {
+                ...errorData,
+                message: error.message,
+                errorType: 'no_response'
+            };
         } else {
             console.error('Request setup error:', error.message);
+            errorData = {
+                ...errorData,
+                message: error.message,
+                errorType: 'request_setup'
+            };
         }
+
+        // Save error response to file
+        await saveResponseToFile(errorData, 'api_response_error');
     }
 }
 
