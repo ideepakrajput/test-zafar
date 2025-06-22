@@ -288,6 +288,27 @@ const removeDuplicates = (array, key) => {
     });
 };
 
+// Add this function to replace placeholders with actual values
+function replacePlaceholders(obj, replacements) {
+    if (typeof obj === 'string') {
+        let result = obj;
+        Object.keys(replacements).forEach(placeholder => {
+            const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            result = result.replace(regex, replacements[placeholder]);
+        });
+        return result;
+    } else if (Array.isArray(obj)) {
+        return obj.map(item => replacePlaceholders(item, replacements));
+    } else if (obj !== null && typeof obj === 'object') {
+        const result = {};
+        Object.keys(obj).forEach(key => {
+            result[key] = replacePlaceholders(obj[key], replacements);
+        });
+        return result;
+    }
+    return obj;
+}
+
 // Main create function
 const create = async (req, res) => {
     try {
@@ -598,7 +619,82 @@ const create = async (req, res) => {
 };
 
 // API endpoint
-app.post('/api/webpages/create', create);
+// app.post('/api/webpages/create', create);
+
+app.post('/api/webpages/create', async (req, res) => {
+    try {
+        const { category, page_type, page_type_id, createdBy, data } = req.body;
+
+        // Define your city combinations
+        const cities = ['New York', 'London', 'Paris', 'Tokyo'];
+        const createdDocuments = [];
+
+        // Generate combinations for each language
+        Object.keys(data).forEach(lang => {
+            cities.forEach(city1 => {
+                cities.forEach(city2 => {
+                    // Skip same city combinations if needed
+                    // if (city1 === city2) return;
+
+                    // Define replacements
+                    const replacements = {
+                        '%country%': city1,
+                        '%country2%': city2,
+                        '%city%': city1,
+                        '%city2%': city2
+                    };
+
+                    // Replace placeholders in the data
+                    const processedData = replacePlaceholders(data[lang], replacements);
+
+                    // Create title and slug based on language
+                    let title, slug;
+                    if (lang === 'en') {
+                        title = `flight-from-${city1}-to-${city2}`;
+                        slug = `flight-from-${city1.toLowerCase().replace(/\s+/g, '-')}-to-${city2.toLowerCase().replace(/\s+/g, '-')}.html`;
+                    } else if (lang === 'es') {
+                        title = `vuelo-de-${city1}-a-${city2}`;
+                        slug = `vuelo-de-${city1.toLowerCase().replace(/\s+/g, '-')}-a-${city2.toLowerCase().replace(/\s+/g, '-')}.html`;
+                    } else if (lang === 'hn') {
+                        title = `${city1}-${city2}-flight`;
+                        slug = `${city1.toLowerCase().replace(/\s+/g, '-')}-${city2.toLowerCase().replace(/\s+/g, '-')}-flight.html`;
+                    }
+
+                    const document = {
+                        category,
+                        page_type: page_type_id,
+                        title,
+                        data: processedData,
+                        lang,
+                        slug,
+                        common_slug: `flight-from-${city1.toLowerCase().replace(/\s+/g, '-')}-to-${city2.toLowerCase().replace(/\s+/g, '-')}.html`,
+                        common_title: `flight from ${city1} to ${city2}`,
+                        query: {
+                            '%city%': city1,
+                            '%city2%': city2
+                        },
+                        createdBy
+                    };
+
+                    createdDocuments.push(document);
+                });
+            });
+        });
+
+        // Save documents to database (assuming you're using MongoDB)
+        // const result = await YourModel.insertMany(createdDocuments);
+
+        res.status(200).json({
+            success: "new documents added!",
+            data: createdDocuments,
+            totalRecords: createdDocuments.length
+        });
+
+    } catch (error) {
+        console.error('Error creating webpages:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 // Test endpoint
 app.get('/test', (req, res) => {
