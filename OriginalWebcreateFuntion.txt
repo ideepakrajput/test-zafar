@@ -1,0 +1,528 @@
+
+function convertToSlug(text) {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, '-')           // Replace spaces with -
+    .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+    .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+    .replace(/^-+/, '')             // Trim - from start of text
+    .replace(/-+$/, '');            // Trim - from end of text
+}
+
+function splitArray(arr, chunkSize) {
+  var result = [];
+  for (var i = 0; i < arr.length; i += chunkSize) {
+    var chunk = arr.slice(i, i + chunkSize);
+    result.push(chunk);
+  }
+  return result;
+}
+
+async function forloop(
+  collection_name,
+  matches,
+  title,
+  body,
+  lang = "en",
+  slug,
+  newdata = {},
+  eng_slug,
+  comm_slug,
+  query
+) {
+  let arrayToInsert = [];
+  let langObj = { en: "english", es: "spanish",hn:"hindi"};
+  // let data = await collection_name.find().limit(4);
+  let data = await collection_name.find()
+
+
+  data = data.filter((entry) => !title.includes(entry[langObj[lang]]));
+
+  //console.log('common_arr-----',common_arr)
+  let sr = 0;
+  for await (const myvar of data) {
+    let query2 = { ...query };
+
+    /* if(matches=='%airline%') {
+      eng_name = myvar.airline_name
+    } else eng_name = myvar.english */
+
+    if (matches == "%airline%") {
+      eng_name = myvar.airline_name;
+    } else eng_name = myvar[langObj[lang]];
+
+    const originalString = title;
+    const searchVariable = matches;
+    const replacementValue = eng_name;
+    //console.log(originalString,searchVariable,replacementValue)
+
+    const modifiedString = originalString.replace(
+      new RegExp(searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      replacementValue
+    );
+    //console.log(modifiedString);
+    let url =
+      convertToSlug(
+        slug.replace(
+          new RegExp(searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+          replacementValue
+        )
+      ) + ".html";
+    var exists = await Webpages.find({ slug: url }).then(async function (
+      result
+    ) {
+      //console.log('result',result)
+      return await result;
+    });
+
+    if (exists.length == 0) {
+      if (matches == "%airline%") {
+        eng_name2 = myvar.airline_name;
+      } else eng_name2 = myvar["english"];
+
+      // console.log('eng_name2 ==> ', eng_name2);
+
+      const originalString2 = title;
+      const originalSlug2 = comm_slug;
+      const searchVariable2 = matches;
+      const replacementValue2 = eng_name2;
+      query2[searchVariable2] = myvar["english"];
+      const modifiedString2 = originalString2.replace(
+        new RegExp(searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+        replacementValue2
+      );
+      const modifiedSlug2 = originalSlug2.replace(
+        new RegExp(searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+        replacementValue2
+      );
+      // console.log('eng_slug ====>',eng_slug);
+      let url2 =
+        convertToSlug(
+          eng_slug.replace(
+            new RegExp(searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+            replacementValue2
+          )
+        ) + ".html";
+      let final_common_slug = convertToSlug(modifiedSlug2) + ".html";
+      let ndata = convertToData(
+        newdata,
+        searchVariable,
+        replacementValue,
+        replacementValue2
+      );
+      //console.log('ndata333',ndata)
+      var singleRow = {
+        category: body.category,
+        page_type: body.page_type_id,
+        title: modifiedString2,
+        data: ndata,
+        lang: lang,
+        slug: url2,
+        common_slug: final_common_slug,
+        common_title: modifiedSlug2,
+        query: query2,
+        createdBy:body.createdBy,
+      };
+
+      //console.log(originalString,searchVariable,replacementValue)
+
+      //console.log(modifiedString);
+
+      // singleRow['common_slug'] = url2
+
+      // console.log('singleRow', url2, singleRow)
+      arrayToInsert.push(singleRow);
+    }
+    sr++;
+  }
+  return arrayToInsert;
+}
+
+// Function to check if any string in the first array exists as a substring in any of the elements of the second array (array of nodes)
+function isAnyStringExistInArrayNode(stringArray, nodeObject) {
+  let narr = [];
+  for (const property in nodeObject) {
+    if (typeof nodeObject[property] === "string") {
+      for (const searchString of stringArray) {
+        if (nodeObject[property].includes(searchString)) {
+          narr.push(searchString); // Found a string that exists as a substring in the array of nodes
+        }
+      }
+    }
+  }
+
+  if (narr.length > 0) {
+    return narr.filter(function (item, pos) {
+      return narr.indexOf(item) == pos;
+    });
+  } else return false;
+}
+
+function convertToData(nodeObject,searchVariable,replacementValue,replacementValue2){
+  let nobj = {};
+
+  for (const property in nodeObject) {
+    if (typeof nodeObject[property] === "string") {
+      let oldval = nodeObject[property];
+
+      const regex = /{{#(.*?)#}}/g;
+      const matches = nodeObject[property].match(regex);
+
+      matches &&
+        matches.forEach((match) => {
+          let nvar = match.replace(
+            new RegExp(
+              searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "g"
+            ),
+            replacementValue2
+          );
+          oldval = oldval.replace(
+            new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+            nvar
+          );
+        });
+
+      nobj[property] = oldval.replace(
+        new RegExp(searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+        replacementValue
+      );
+    } else if (typeof nodeObject[property] === "object") {
+      console.log("Reached in object");
+      nobj[property] = convertToData(
+        nodeObject[property],
+        searchVariable,
+        replacementValue,
+        replacementValue2
+      );
+    }
+  }
+
+  return nobj;
+}
+
+exports.create = async (req, res) => {
+  if (!req.body.page_type || !req.body.category) {
+    res
+      .status(400)
+      .send({ message: "category and page_type can not be empty!" });
+    return;
+  }
+  let categories = [
+    "%city%",
+    "%city2%",
+    "%country%",
+    "%country2%",
+    "%airline%",
+    "%airline2%",
+    "%airport%",
+    "%airport2%",
+  ];
+
+  // console.log(req.body.data);
+
+  let pageslugs = await Page_types.findOne({ _id: req.body.page_type_id });
+
+  let slugs = {};
+
+  if (
+    pageslugs.languages &&
+    req.body.data &&
+    pageslugs.languages.length > 0 &&
+    Object.keys(pageslugs.languages[0]).length > 0 &&
+    Object.keys(req.body.data).length > 0
+  ) {
+    for await (let key of Object.keys(req.body.data)) {
+      // console.log(req.body.data[key], pageslugs.languages[key])
+
+      if (req.body.data[key].slug) {
+        slugs[key] = req.body.data[key].slug;
+      } else if (pageslugs.languages[0][key]) {
+        slugs[key] = pageslugs.languages[0][key];
+      } else {
+        slugs[key] = req.body.page_type;
+      }
+    }
+  } else if (req.body.data && Object.keys(req.body.data).length > 0) {
+    for await (let key of Object.keys(req.body.data)) {
+      if (req.body.data[key].slug) {
+        // console.log('the if block');
+        slugs[key] = req.body.data[key].slug;
+      } else {
+        // console.log('the else block');
+        slugs[key] = pageslugs.languages[key];
+      }
+    }
+  } else {
+    slugs["en"] = req.body.page_type;
+  }
+
+  const slugObj = {};
+  for await (let key of Object.keys(slugs)) {
+    let narr = [];
+    if (typeof slugs[key] === "string") {
+      for await (const searchString of categories) {
+        if (slugs[key].includes(searchString)) {
+          narr.push(searchString); // Found a string that exists as a substring in the array of nodes
+        }
+      }
+    }
+
+    slugObj[key] = narr;
+  }
+
+  let body_arr = {};
+  for await (let key of Object.keys(req.body.data)) {
+  
+    const result = isAnyStringExistInArrayNode(categories, req.body.data[key]);
+    // console.log(result);
+
+    let arra;
+    if (slugObj[key].length > 0 && result.length > 0) {
+      arra = result.filter((x) => !slugObj[key].includes(x));
+  
+    }
+
+    body_arr[key] = arra;
+  }
+  
+
+  let catobj = {
+    "%city%": Cities,
+    "%city2%": Cities,
+    "%country%": Countries,
+    "%country2%": Countries,
+    "%airline%": Airlines,
+    "%airline2%": Airlines,
+    "%airport%": Airports,
+    "%airport2%": Airports,
+  };
+  let langObj = { en: "english", es: "spanish",hn: "hindi" };
+  let matches = slugObj;
+  // console.log('matches', matches)
+  if (Object.keys(matches).length > 0) {
+    var arrayToInsert = [];
+    for await (let key of Object.keys(matches)) {
+      let collection_name = catobj[matches[key][0]];
+      let eng_name = "";
+      let eng_slug = "english";
+
+      if (collection_name){
+        let data = await collection_name.find().limit(4);
+        // let data = await collection_name.find()
+
+
+        // console.log(key+'----', data,matches[key][0]);
+
+        for await (const myvar of data) {
+        
+          let query = {};  
+          if (matches[key][0] == "%airline%") {
+          eng_name = myvar.airline_name;
+          eng_slug = myvar.airline_name; // or another slug field
+        } else {
+          if (key === 'hn') {
+            eng_name = myvar["english"]; // use English for Hindi slug/meta
+            eng_slug = myvar["english"];
+          } else {
+            eng_name = myvar[langObj[key]];
+            eng_slug = myvar["english"];
+          }
+        }
+
+          let common_page_type = pageslugs.languages[key];
+         
+          const originalString = common_page_type;
+          const searchVariable = matches[key][0];
+          const replacementValue = eng_name;
+          const originalCommonSlug = pageslugs.title;
+          //console.log(slugs[key]);
+          const modifiedString = originalString.replace(
+            new RegExp(searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+            replacementValue
+          );
+          const modifiedCommonSlug = originalCommonSlug.replace(
+            new RegExp(searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+            eng_slug
+          );
+          let data2 = await collection_name.find().limit(4);
+        
+          data2 = data2.filter(
+            (item) => item[langObj[key]] !== replacementValue
+          );
+        
+          if (matches[key][0] == "%airline%") {
+            eng_name = myvar.airline_name;
+            eng_slug = myvar.airline_name;
+          } else {
+            if (key === 'hn') {
+              eng_name = myvar["english"];
+              eng_slug = myvar["english"];
+            } else {
+              eng_name = myvar[langObj[key]];
+              eng_slug = myvar["english"];
+            }
+          }
+
+
+          const originalString2 = modifiedString;
+          const originalCommonSlug2 = modifiedCommonSlug;
+          const searchVariable2 = matches[key][0];
+          const replacementValue2 = eng_name;
+          const replacementSlug2 = eng_slug;
+          //console.log(slugs[key]);
+          query[searchVariable2] = myvar["english"];
+
+
+          const modifiedString2 = originalString2.replace(
+            new RegExp(searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+            replacementValue2
+          );
+          const modifiedCommonSlug2 = originalCommonSlug2.replace(
+            new RegExp(searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+            replacementSlug2
+          );
+          let ndata = convertToData(
+                      req.body.data[key],
+                      searchVariable,
+                      replacementValue,
+                      replacementValue2
+                    );
+
+
+          //console.log('ndata',ndata,matches[key].length)
+          //return;
+          if (matches[key].length > 1) {
+            let modifiedSlug;
+            if (slugs[key]) {
+              const oslug = modifiedString;
+              modifiedSlug = oslug.replace(
+                new RegExp(
+                  searchVariable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                ),
+                replacementValue
+              );
+              //console.log(modifiedSlug)
+            }
+            let url2 = modifiedSlug != "" ? modifiedSlug : modifiedString;
+
+            let modifiedSlug2;
+            if (slugs[key]) {
+              const oslug2 = modifiedString2;
+              modifiedSlug2 = oslug2.replace(
+                new RegExp(
+                  searchVariable2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                ),
+                replacementValue2
+              );
+              //console.log(modifiedSlug)
+            }
+            let common_slug =
+              modifiedSlug2 != "" ? modifiedSlug2 : modifiedString2;
+            // console.log("common_slug",common_slug)
+
+            let arr2 = await forloop(
+              catobj[matches[key][1]],
+              matches[key][1],
+              modifiedString2,
+              req.body,
+              key,
+              url2,
+              ndata,
+              common_slug,
+              modifiedCommonSlug2,
+              query
+            );
+           
+            if (matches[key].length == 3 && arr2.length > 0) {
+              for await (const arr2val of arr2) {
+                let arr3 = await forloop(
+                  catobj[matches[key][2]],
+                  matches[key][2],
+                  arr2val.title,
+                  req.body,
+                  key,
+                  arr2val.slug,
+                  arr2val.data,
+                  arr2val.title,
+                  arr2val.common_title,
+                  query
+                );
+
+                arrayToInsert = arrayToInsert.concat(arr3);
+                // await Webpages.create(arr3)
+                // console.log(arr3);
+              }
+            } else {
+              // console.log(arr2);
+             
+                arrayToInsert = arrayToInsert.concat(arr2);
+            
+                // await Webpages.create(arr2)
+
+            }
+          } else {
+            let url = convertToSlug(modifiedCommonSlug2) + ".html";  // Always based on English
+            let final_common_slug = convertToSlug(modifiedCommonSlug2) + ".html";  // Always English-based
+             
+            var exists = await Webpages.find({ slug: url }).then(function (
+              result
+            ) {
+              //console.log('result',result)
+              return result;
+            });
+
+            if (exists.length == 0) {
+              var singleRow = {
+                category: req.body.category,
+                page_type: req.body.page_type_id,
+                title: modifiedString2,
+                data: ndata,
+                // data:convertToData(ndata, searchVariable, replacementValue),
+                slug: url,
+                lang: key,
+                common_slug: final_common_slug,
+                query: query,
+                createdBy: req.body.createdBy,
+              };
+              
+                arrayToInsert.push(singleRow);
+              
+              
+                // await Webpages.create(singleRow)
+
+            }
+          }
+          // }
+        }
+      }
+    }
+
+  }
+
+  const filteredArray = removeDuplicates(arrayToInsert, "title");
+  var chunkedArray = splitArray(filteredArray, 10);
+  console.log(chunkedArray);
+
+  for await (const insertRecords of chunkedArray) {
+    await Webpages.insertMany(insertRecords);
+  }
+  res
+    .status(200)
+    .json({ success: "new documents added!", data: filteredArray });
+};
+
+
+
+const removeDuplicates = (array, key) => {
+  const uniqueKeys = new Set();
+  return array.filter((obj) => {
+    const keyValue = obj[key];
+    if (!uniqueKeys.has(keyValue)) {
+      uniqueKeys.add(keyValue);
+      return true;
+    }
+    return false;
+  });
+};

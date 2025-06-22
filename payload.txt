@@ -1,0 +1,53 @@
+{
+    "category": "countries",
+    "page_type": "flight from %city% to %city2%",
+    "page_type_id": "6834941abfae2612e862942d",
+    "createdBy": "66c7283d85272162e6e246b8",
+    "data": {
+        "en": {
+            "flights": [
+                {
+                    "heading": "flight from %country% to %country2%",
+                    "slogan": "",
+                    "queryType": "cheapest",
+                    "componentType": "flight",
+                    "slug": "flight-from-%country%-to-%country2%"
+                }
+            ],
+            "faqs": [],
+            "subheading": "Flight to %country%",
+            "meta_title": "Flight to %country%",
+            "meta_description": "Flight to %country%"
+        },
+        "es": {
+            "flights": [
+                {
+                    "heading": "vuelo de %country% a %country2%",
+                    "slogan": "",
+                    "queryType": "latest",
+                    "componentType": "flight",
+                    "slug": "vuelo-de-%country%-a-%country2%"
+                }
+            ],
+            "faqs": [],
+            "subheading": "Vuelo a %country%",
+            "meta_title": "Vuelo a %country%",
+            "meta_description": "Vuelo a %country%"
+        },
+        "hn": {
+            "flights": [
+                {
+                    "heading": "%country% से %country2% तक उड़ान",
+                    "slogan": "",
+                    "queryType": "latest",
+                    "componentType": "flight",
+                    "slug": "%country%--%country2%--"
+                }
+            ],
+            "faqs": [],
+            "subheading": "%country% के लिए उड़ान",
+            "meta_title": "%country% के लिए उड़ान",
+            "meta_description": "%country% के लिए उड़ान"
+        }
+    }
+}
